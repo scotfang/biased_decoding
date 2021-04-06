@@ -4,6 +4,8 @@ import os
 import pytest
 import numpy as np
 
+import sys
+sys.path.append("/home/scotfang/gits/CTranslate2/python/build/lib.linux-x86_64-3.7")
 import ctranslate2
 
 from ctranslate2.specs.model_spec import OPTIONAL, index_spec
@@ -212,13 +214,81 @@ def test_invalid_translation_options():
             min_decoding_length=10,
             max_decoding_length=5)
 
-def test_target_prefix():
+def test_hard_target_prefix():
     translator = _get_transliterator()
     output = translator.translate_batch(
         [["آ" ,"ت" ,"ز" ,"م" ,"و" ,"ن"], ["آ" ,"ت" ,"ش" ,"ي" ,"س" ,"و" ,"ن"]],
         target_prefix=[["a", "t", "s"], None])
     assert output[0][0]["tokens"][:3] == ["a", "t", "s"]
     assert output[1][0]["tokens"] == ["a", "c", "h", "i", "s", "o", "n"]
+
+def test_strongly_biased_target_prefix():
+    translator = _get_transliterator()
+    output = translator.translate_batch(
+        [["آ" ,"ت" ,"ز" ,"م" ,"و" ,"ن"], ["آ" ,"ت" ,"ش" ,"ي" ,"س" ,"و" ,"ن"]],
+        target_prefix=[["a", "t", "s"], None],
+        prefix_bias_beta=0.9999999)
+    assert output[0][0]["tokens"][:3] == ["a", "t", "s"]
+    assert output[1][0]["tokens"] == ["a", "c", "h", "i", "s", "o", "n"]
+
+def test_weakly_biased_target_prefix():
+    translator = _get_transliterator()
+    unconstrained_output = translator.translate_batch(
+        [["آ" ,"ت" ,"ز" ,"م" ,"و" ,"ن"], ["آ" ,"ت" ,"ش" ,"ي" ,"س" ,"و" ,"ن"]])
+    weakly_biased_output = translator.translate_batch(
+        [["آ" ,"ت" ,"ز" ,"م" ,"و" ,"ن"], ["آ" ,"ت" ,"ش" ,"ي" ,"س" ,"و" ,"ن"]],
+        target_prefix=[["a", "t", "s"], ["s", "i", "o"]],
+        prefix_bias_beta=0.0000001)
+    assert unconstrained_output[0][0]["tokens"] == weakly_biased_output[0][0]["tokens"]
+    assert abs(unconstrained_output[0][0]["score"] - weakly_biased_output[0][0]["score"]) < 0.00001
+
+    assert unconstrained_output[1][0]["tokens"] == weakly_biased_output[1][0]["tokens"]
+    assert abs(unconstrained_output[1][0]["score"] - weakly_biased_output[1][0]["score"]) < 0.00001
+
+def test_didi_cuda_nihao_no_prefix():
+    translator = ctranslate2.Translator(
+            "/home/yiqihuang/projects/didi-translate/data/ctranslate2_models/zhen-v4/ctranslate2",
+            device='cuda')
+            
+    output = translator.translate_batch(
+        [["你好"]], beam_size=4, length_penalty=0, target_prefix=[None], prefix_bias_beta=0.99)
+    assert output[0][0]['tokens'] == ['Hello']
+
+def test_didi_cuda_nihao_strongly_biased_prefix():
+    translator = ctranslate2.Translator(
+            "/home/yiqihuang/projects/didi-translate/data/ctranslate2_models/zhen-v4/ctranslate2",
+            device='cuda')
+            
+    output = translator.translate_batch(
+        [["你好"]], beam_size=4, length_penalty=0, target_prefix=[["Bye"]], prefix_bias_beta=0.99)
+    assert output[0][0]['tokens'] == ['Bye']
+
+def test_didi_cuda_nihao_weakly_biased_prefix():
+    translator = ctranslate2.Translator(
+            "/home/yiqihuang/projects/didi-translate/data/ctranslate2_models/zhen-v4/ctranslate2",
+            device='cuda')
+            
+    output = translator.translate_batch(
+        [["你好"]], beam_size=4, length_penalty=0, target_prefix=[["Bye"]], prefix_bias_beta=0.01)
+    assert output[0][0]['tokens'] == ['Hello']
+
+def test_didi_weakly_biased_decoding_los_angeles():
+    translator = ctranslate2.Translator(
+            "/home/yiqihuang/projects/didi-translate/data/ctranslate2_models/zhen-v4/ctranslate2",
+            device='cuda')
+            
+    output = translator.translate_batch(
+        [["洛杉矶"]], beam_size=2, length_penalty=0, target_prefix=[["San", "Francisco"]], prefix_bias_beta=0.01)
+    assert output[0][0]['tokens'] == ['Los', 'Angeles']
+
+def test_didi_strongly_biased_decoding_los_angeles():
+    translator = ctranslate2.Translator(
+            "/home/yiqihuang/projects/didi-translate/data/ctranslate2_models/zhen-v4/ctranslate2",
+            device='cuda')
+            
+    output = translator.translate_batch(
+        [["洛杉矶"]], beam_size=2, length_penalty=0, target_prefix=[["San", "Francisco"]], prefix_bias_beta=0.99)
+    assert output[0][0]['tokens'] == ['San', 'Francisco']
 
 def test_num_hypotheses():
     translator = _get_transliterator()

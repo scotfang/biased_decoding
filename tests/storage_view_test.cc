@@ -46,6 +46,21 @@ TEST(StorageViewTest, Reshape) {
   assert_vector_eq(a.shape(), Shape{16});
 }
 
+TEST(StorageViewTest, View) {
+  StorageView a({2, 2}, std::vector<float>{2, 3, 4, 5});
+
+  StorageView x({1, 2}, a.data<float>());
+  StorageView expected_x({1, 2}, std::vector<float>{2, 3});
+  expect_storage_eq(x, expected_x);
+  
+  StorageView y({1, 2}, a.data<float>() + 2);
+  StorageView expected_y({1, 2}, std::vector<float>{4, 5});
+  expect_storage_eq(y, expected_y);
+
+  StorageView y2({1, 2}, a.index<float>({1, 0}));
+  expect_storage_eq(y2, expected_y);
+}
+
 class StorageViewDeviceTest : public ::testing::TestWithParam<Device> {
 };
 

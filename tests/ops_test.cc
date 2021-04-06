@@ -166,6 +166,15 @@ TEST_P(OpDeviceTest, MulScalar) {
   expect_storage_eq(c, expected);
 }
 
+TEST_P(OpDeviceTest, MulScalarSameContainer) {
+  Device device = GetParam();
+  StorageView a({4}, std::vector<float>{1, 2, 3, 4}, device);
+  StorageView b(static_cast<float>(3));
+  StorageView expected({4}, std::vector<float>{3, 6, 9, 12}, device);
+  ops::Mul()(a, b, a);
+  expect_storage_eq(a, expected);
+}
+
 TEST_P(OpDeviceTest, Sub) {
   Device device = GetParam();
   StorageView a({4}, std::vector<float>{1, 2, 3, 4}, device);
@@ -566,16 +575,28 @@ TEST_P(OpDeviceFPTest, SoftMax) {
 }
 
 TEST_P(OpDeviceFPTest, LogSoftMax) {
-  const Device device = GetParam().first;
+  const Device device = GetParam().first; 
   const DataType dtype = GetParam().second;
-  StorageView x({2, 10}, std::vector<float>{
-      -0.2, 3.0, 1.2, -1.1, 0.0, 0.2, -3.0, -1.2, 1.1, 0.0,
+  StorageView x({2, 10}, std::vector<float>{ -0.2, 3.0, 1.2, -1.1, 0.0, 0.2, -3.0, -1.2, 1.1, 0.0,
       4.6, 3.3, 0.2, -1.6, 1.0, -4.6, -3.3, -0.2, 1.6, -1.0}, device);
   StorageView expected({2, 10}, std::vector<float>{
       -3.638294, -0.438294, -2.238294, -4.538294, -3.438294, -3.238294, -6.438294, -4.638294, -2.338294, -3.438294,
       -0.319434, -1.619434, -4.719434, -6.519434, -3.919434, -9.519434, -8.219434, -5.119434, -3.319434, -5.919434}, device);
   StorageView y(dtype, device);
   ops::LogSoftMax()(x.to(dtype), y);
+  expect_storage_eq(y.to_float(), expected, 1e-2);
+}
+
+TEST_P(OpDeviceFPTest, LogSoftMaxSimple) {
+  const Device device = GetParam().first;
+  const DataType dtype = GetParam().second;
+  StorageView x({1, 2}, std::vector<float>{
+      1.0, 2.0}, device);
+  StorageView expected({1, 2}, std::vector<float>{
+      -1.313262, -0.313262}, device);
+  StorageView y(dtype, device);
+  ops::LogSoftMax()(x.to(dtype), y);
+
   expect_storage_eq(y.to_float(), expected, 1e-2);
 }
 
@@ -662,6 +683,19 @@ TEST_P(OpDeviceTest, Log) {
   StorageView output(device);
   ops::Log()(input, output);
   expect_storage_eq(output, expected, 1e-4);
+}
+
+TEST_P(OpDeviceTest, LogSoftMaxSimpleTwoStep) {
+  Device device = GetParam();
+  StorageView x({1, 2}, std::vector<float>{
+      1.0, 2.0}, device);
+  StorageView expected({1, 2}, std::vector<float>{
+      -1.313262, -0.313262}, device);
+  StorageView y(DataType::FLOAT, device);  // FLOAT16 is not supported by ops::Log()
+  ops::SoftMax()(x, y);
+  ops::Log()(y, y);
+
+  expect_storage_eq(y.to_float(), expected, 1e-2);
 }
 
 template <typename T, typename Ops, typename Func>

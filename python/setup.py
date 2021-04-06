@@ -1,5 +1,6 @@
 import io
 import os
+import sys
 import pybind11
 
 from setuptools import setup, find_packages, Extension
